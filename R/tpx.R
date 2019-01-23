@@ -159,8 +159,6 @@ tpxinit <- function(X, initheta, K1, alpha, verb, nbundles=1,
 
     if(i<nK){ initheta <- tpxThetaStart(X, fit$theta, fit$omega, Kseq[i+1]) }else{ initheta <- fit$theta }
   }
-  if(verb){ cat("done.\n") }
-#  return(initheta)
   }
   return(initheta)
 }
@@ -195,8 +193,9 @@ tpxfit <- function(X, theta, alpha, tol, verb,
   dif <- tol+1+qn
   update <- TRUE
   if(verb>0){
-    cat("log posterior increase: " )
-    digits <- max(1, -floor(log(tol, base=10))) }
+    cat("iter ---log-posterior---\n")
+    digits <- max(1, -floor(log(tol, base=10)))
+  }
 
   Y <- NULL # only used for qn > 0
   Q0 <- col_sums(X)/sum(X)
@@ -215,7 +214,6 @@ tpxfit <- function(X, theta, alpha, tol, verb,
                            start=omega, theta=theta,  verb=0, nef=TRUE, wtol=wtol, tmax=20)
       }
       if(iter > burn_in){
-       # system.time(suppressWarnings(select_genes <- as.numeric(na.omit(as.vector(ExtractTopFeatures(theta, top_genes))))))
          ptm <- proc.time()
 
         topic_index <- apply(theta,1, which.max);
@@ -313,8 +311,7 @@ tpxfit <- function(X, theta, alpha, tol, verb,
     theta <- normalizetpx(theta + 1e-15, byrow=FALSE);
     move <- tpxEM(X=X, m=m, theta=theta, omega=Wfit, alpha=alpha, admix=admix,
                   method_admix=method_admix, grp=grp)
-  #  L_new <- tpxlpost(X=X, theta=move$theta, omega=move$omega, alpha=alpha, admix=admix, grp=grp)
-  #  QNup <- list("move"=move, "L"=L_new, "Y"=NULL)
+
     ## quasinewton-newton acceleration
     QNup <- tpxQN(move=move, Y=Y, X=X, alpha=alpha, verb=verb, admix=admix, grp=grp, doqn=qn-dif)
     if(type=="independent"){
@@ -337,46 +334,29 @@ tpxfit <- function(X, theta, alpha, tol, verb,
       QNup$L <-  tpxlpost(X=X, theta=move$theta, omega=move$omega, alpha=alpha, admix=admix, grp=grp) }
 
     ## calculate dif
-    dif <- (QNup$L-L)
-
-    L <- QNup$L
-
+    dif <- (QNup$L - L)
+    L   <- QNup$L
 
     ## check convergence
     if(abs(dif) < tol){
       if(sum(abs(theta-move$theta)) < tol){ update = FALSE } }
 
     ## print
-    if(verb>0 && (iter-1)%%ceiling(10/verb)==0 && iter>0){
-    ##if(verb>0 && iter>0){
-      cat( paste( round(dif,digits), #" (", sum(abs(theta-move$theta)),")",
-                 ", ", sep="") ) }
-
-    ## heartbeat for long jobs
-    if(((iter+1)%%1000)==0){
-          cat(sprintf("p %d iter %d diff %g\n",
-                nrow(theta), iter+1,round(dif))) }
+    if(verb > 0 & iter > 0)
+      cat(sprintf("%4d %0.12e\n",iter,L))
 
     ## iterate
     iter <- iter+1
     theta <- move$theta
     omega <- move$omega
-
   }
 
   ## final log posterior
   L <- tpxlpost(X=X, theta=theta, omega=omega, alpha=alpha, admix=admix, grp=grp)
 
-  ## summary print
-  if(verb>0){
-    cat("done.")
-    if(verb>1) { cat(paste(" (L = ", round(L,digits), ")", sep="")) }
-    cat("\n")
-  }
-
   out <- list(theta=theta, omega=omega, K=K, alpha=alpha, L=L, iter=iter)
-  invisible(out) }
-
+  invisible(out)
+}
 
 ## ** called from topics.R (predict) and tpx.R
 ## Conditional solution for topic weights given theta
